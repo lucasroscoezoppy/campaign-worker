@@ -73,7 +73,7 @@ export class CampaignBase {
     public async failCampaignRecipient(campaign: Campaign, campaignRecipient: CampaignRecipient, error: any): Promise<void> {
         await Campaign.update(
             {
-                failed: [...(campaign.failed ?? []), campaignRecipient.contact],
+                failed: campaignRecipient.contact ? [...campaign.failed, campaignRecipient.contact] : campaign.failed,
                 errorMessage: error?.message ?? JSON.stringify(error ?? '')
             },
             { where: { id: campaign.id } }

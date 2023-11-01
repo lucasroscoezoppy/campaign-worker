@@ -77,7 +77,7 @@ export class CampaignSegmentEmailHelper {
             content: emailHtml,
             companyId: company.id,
             email: address.email,
-            couponCode: coupon.code
+            couponCode: coupon?.code
         });
         const template: string = MessageTemplateUtil.replaceParameters(emailHtml, templateParamEntities);
         const subject: string = MessageTemplateUtil.replaceParameters(emailSubject, templateParamEntities);

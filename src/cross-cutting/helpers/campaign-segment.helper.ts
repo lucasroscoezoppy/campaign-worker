@@ -65,6 +65,7 @@ export class CampaignSegmentHelper {
                     break;
             }
             response.sucess = campaignRecipient.contact;
+            await CampaignRecipient.update({ status: CampaignStatusEnum.COMPLETED }, { where: { id: campaignRecipient.id } });
         } catch (error: any) {
             response.fail = campaignRecipient.contact;
             await CampaignRecipient.update(

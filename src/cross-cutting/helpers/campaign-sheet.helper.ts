@@ -70,8 +70,8 @@ export class CampaignSheetHelper {
 
         await Campaign.update(
             {
-                success: [...(campaign.success ?? []), response.sucess ?? []],
-                failed: [...(campaign.failed ?? []), response.fail ?? []]
+                success: response.sucess ? [...campaign.success, response.sucess] : campaign.success,
+                failed: response.fail ? [...campaign.failed, response.fail] : campaign.failed
             },
             {
                 where: { id: campaign.id }

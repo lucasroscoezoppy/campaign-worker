@@ -33,7 +33,7 @@
     "@ZoppyTech/shared": "~3.0.5",
     "@ZoppyTech/utilities": "~2.1.9",
     "@ZoppyTech/whatsapp": "~2.2.4",
-    "@ZoppyTech/zenvia": "~1.0.3",
+    "@ZoppyTech/zenvia": "~1.0.5",
     "aws-sdk": "^2.1282.0",
     "dotenv": "^16.0.3",
     "mysql2": "^2.3.3",
