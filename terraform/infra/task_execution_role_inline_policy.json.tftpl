@@ -1,0 +1,24 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "logs:CreateLogGroup",
+        "Effect": "Allow",
+        "Resource": [
+          "arn:aws:logs:us-east-1:${account_id}:log-group:/ecs/${application}-${project}-${environment}:*"
+        ]
+      },
+      {
+        "Effect": "Allow",
+        "Action": "s3:GetObject",
+        "Resource": [
+          "arn:aws:s3:::zoppy-environment/${task_env_path}/*"
+        ]
+      },
+      {
+        "Effect"  : "Allow",
+        "Action"  : "s3:GetBucketLocation",
+        "Resource": "arn:aws:s3:::zoppy-environment"
+      }
+    ]
+}

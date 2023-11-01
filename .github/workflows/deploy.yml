@@ -1,0 +1,150 @@
+name: 'CI/CD'
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'development'
+
+jobs:
+  terraform-required:
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+      TERRAFORM_WORKSPACE: ${{ github.ref_name	}}
+    defaults:
+      run:
+        working-directory: ${{ vars.TF_REQUIRED_WORKDIR }}
+    name: Apply terraform required resources
+    outputs:
+      ecr_repo_url: ${{ steps.ecr_repo_url.outputs.url }}
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ vars.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup github PAT
+        run: git config --global url."https://${{ secrets.GH_TERRAFORM_PAT }}@github.com".insteadOf https://github.com
+
+      - name: Terraform version
+        run: terraform version
+
+      - name: Terraform format
+        run: terraform fmt -check -diff
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform workspace select
+        run: terraform workspace select -or-create ${TERRAFORM_WORKSPACE}
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: tfsec scan
+        run: |
+          docker run --rm -v $PWD:/app -w /app aquasec/tfsec:v1.28 .
+
+      - name: Terraform plan
+        run: terraform plan -out tfplan
+
+      - name: Terraform apply
+        if: vars.TF_REQUIRED_APPLY == 'true'
+        run: terraform apply tfplan
+
+      - name: Output repo url
+        id: ecr_repo_url
+        run: |
+          echo "url=$(terraform output -raw repo_url)" >> "$GITHUB_OUTPUT"
+
+  ecr-docker-image:
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+      REPO_URL: ${{ needs.terraform-required.outputs.ecr_repo_url }}
+    name: Build and push docker image
+    needs: terraform-required
+    outputs:
+      image_url: ${{ steps.push-image.outputs.url }}
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build docker image
+        run: |
+          docker image build -t ${{ env.REPO_URL }}:${{ github.sha }} --build-arg "NPM_TOKEN=${{ secrets.NPM_TOKEN }}" .
+
+      - name: Push docker image
+        id: push-image
+        run: |
+          docker image push ${{ env.REPO_URL }}:${{ github.sha }} && echo "url=${{ env.REPO_URL }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+  terraform-infra:
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+      TERRAFORM_WORKSPACE: ${{ github.ref_name	}}
+      TF_VAR_image_url: ${{ needs.ecr-docker-image.outputs.image_url }}
+    defaults:
+      run:
+        working-directory: ${{ vars.TF_INFRA_WORKDIR }}
+    name: Apply terraform resources
+    needs: ecr-docker-image
+    outputs:
+      ecr_repo_url: ${{ steps.ecr_repo_url.outputs.url }}
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ vars.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup github PAT
+        run: git config --global url."https://${{ secrets.GH_TERRAFORM_PAT }}@github.com".insteadOf https://github.com
+
+      - name: Terraform version
+        run: terraform version
+
+      - name: Terraform format
+        run: terraform fmt -check -diff
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform workspace select
+        run: terraform workspace select -or-create ${TERRAFORM_WORKSPACE}
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: tfsec scan
+        run: |
+          docker run --rm -v $PWD:/app -w /app aquasec/tfsec:v1.28 .
+
+      - name: Terraform plan
+        run: terraform plan -out tfplan
+
+      - name: Terraform apply
+        if: vars.TF_REQUIRED_APPLY == 'true'
+        run: terraform apply tfplan

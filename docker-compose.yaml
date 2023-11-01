@@ -1,0 +1,25 @@
+version: '3.9'
+
+#List of services
+services:
+    #Backend image
+    worker:
+        container_name: zoppy_campaign_worker
+        build:
+            context: .
+            dockerfile: Local.Dockerfile
+        command: npm run start:debug
+        ports:
+            - ${WORKER_PORT}:${WORKER_PORT}
+            - ${DEBUG_PORT}:${DEBUG_PORT}
+        volumes:
+            - .:/app
+            - /app/node_modules
+        env_file:
+            - .env
+        networks:
+            - zoppy-network
+
+networks:
+    zoppy-network:
+        name: zoppy-api_zoppy-network
